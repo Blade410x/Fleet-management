@@ -1,0 +1,384 @@
+import mysql.connector as c
+from tabulate import tabulate
+conn=c.connect(host="localhost", user="root", password=*Your passowrd here*, database=*Your database here*)
+cursor=conn.cursor()
+query="create table if not exists vehicle (rt_no integer not null default 0, brand varchar (50), model varchar (50), unloaded_wt_ton integer, seats integer, n_plate varchar(50), avg float(5,2), current_stat varchar (50) generated always as (case when rt_no>0 then 'Active' else 'Inactive' end));"
+cursor.execute(query)
+conn.commit()
+query="create table if not exists routes(rt_no integer not null default 0, from_place varchar (50), to_place varchar(50), distance_km integer, departure time default '00:00:00', arrival time default '00:00:00', buses integer);"
+cursor.execute(query)
+conn.commit()
+query="create table if not exists finances (n_plate varchar (50), running_cst_est integer not null default 0, monthly_maintenance integer not null default 0, damages_ifany integer not null default 0, monthly_profit integer not null default 0, net integer generated always as (monthly_profit - damages_ifany - monthly_maintenance - running_cst_est));"
+cursor.execute(query)
+conn.commit()
+print("Fleet Management.")
+y=True
+while y:
+    print("Select choices : \n1.Bus management \n2.Route management \n3.Finances \n4.Exit")
+    a=int(input("Choice : "))
+    if a==1:
+        print("~~~~~~~~~~~~~~~~VEHICLES~~~~~~~~~~~~~~~~")
+        v=True
+        while v:
+            print("Select : \n1.Add buses \n2.Remove buses \n3.Show fleet \n4.Specify by route \n5.Show inactive \n6.Show active \n7.Assign to route \n8.Withdraw from route \n9.Exit")
+            b=int(input("Choice : "))
+            if(b==1):
+                brand=input("Brand : ")
+                model=input("Model : ")
+                un=int(input("Unladen weight in tons: "))
+                seats=int(input("Seat count : "))
+                avg=float(input("Average mileage in kmpl (decimal) : "))
+                nplate=input("Number plate (no spaces): ")
+                nplate=nplate.upper()
+                rt=int(input("Route (0 if no route) : "))
+                query="insert into vehicle (brand, model, unloaded_wt_ton, seats, avg, n_plate, rt_no) values (%s,%s,%s,%s,%s,%s,%s);"
+                val=(brand,model,un,seats,avg,nplate,rt)
+                try:
+                    cursor.execute(query,val)
+                    conn.commit()
+                except c.IntegrityError as err:
+                    print(f"Error occured : {err}, buses with same number plate might be present in present vehicle fleet, check and try again.")
+                query="insert into finances (n_plate) values (%s)"
+                val=(nplate,)
+                try:
+                    cursor.execute(query)
+                    conn.commit()
+                except c.IntegrityError as err:
+                    print(f"Error occured : {err}, buses with same number plate might be present in the finances tab, check and retry again.")
+                print("saved.")
+            elif(b==2):
+                nplate=input("enter vehicle numberplate (no spaces) : ")
+                query="select * from vehicle where n_plate=%s;"
+                value=(nplate,)
+                cursor.execute(query,value)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("Vehicle not found.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+                    r=int(input("Sure to remove this vehicle? (1-Yes/ 2-No) : "))
+                    if(r==1):
+                        query="delete from vehicle where n_plate=%s"
+                        cursor.execute(query,value)
+                        conn.commit()
+                        query="delete from finances where n_plate=%s"
+                        cursor.execute(query,value)
+                        conn.commit()
+                        print("Removed.")
+                    else:
+                        print("Cancelled.")
+            elif(b==3):
+                query="select * from vehicle;"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No vehicle present/found.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==4):
+                rt=int(input("Route Number : "))
+                query="select * from vehicle where rt_no=%s;"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No vehicle present/found")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==5):
+                query="select * from vehicle where current_stat='Inactive';"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No inactive vehicles")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==6):
+                query="select * from vehicle where current_stat='Active';"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No active vehicles.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==7):
+                query="select * from vehicle where current_stat='Inactive';"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No vehicle available for duty.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+                    n_plate=input("Enter number plate to select : ")
+                    l=n_plate.split()
+                    nnplate=""
+                    for i in l:
+                        nnplate=nnplate+i
+                    nnplate=nnplate.upper()
+                    query="select * from vehicle where n_plate=%s;"
+                    value=(nnplate,)
+                    cursor.execute(query,value)
+                    rows=cursor.fetchall()
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+                    query="select * from routes;"
+                    cursor.execute(query)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("No routes availabe.")
+                    else:
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows, headers=headers, tablefmt='grid'))
+                        rt=int(input("Select route number : "))
+                        rrt=rt
+                        query="select * from routes where rt_no=%s;"
+                        value=(rt,)
+                        cursor.execute(query,value)
+                        rows=cursor.fetchall()
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows, headers=headers, tablefmt='grid'))
+                        a=int(input("sure to add? (1-Yes/2-No) : "))
+                        if(a==1):
+                            query="update vehicle set rt_no=%s where n_plate=%s;"
+                            value=(rt, nnplate)
+                            cursor.execute(query, value)
+                            conn.commit()
+                            query="update routes set buses=buses+1 where rt_no=%s;"
+                            value=(rrt,)
+                            cursor.execute(query, value)
+                            conn.commit()
+                        else:
+                            print("Cancelled.")
+            elif(b==8):
+                query="select * from vehicle where current_stat='Active';"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No buses are active.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows,headers=headers, tablefmt='grid'))
+                    nplate=input("enter numberplate (no spaces) : ")
+                    value=(nplate,)
+                    query="select n_plate from vehicle where n_plate=%s;"
+                    cursor.execute(query,value)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("No such vehicles are present.")
+                    else:
+                        query="select rt_no from vehicle where n_plate=%s;"
+                        cursor.execute(query, value)
+                        result=cursor.fetchone()
+                        d=int(input("Sure to withdraw {nplate} from duty? (1-Yes/2-No) : "))
+                        if(d==1):
+                            query="update vehicle set rt_no=0 where n_plate=%s;"
+                            cursor.execute(query,value)
+                            conn.commit()
+                            query="update routes set buses=buses-1 where rt_no=%s"
+                            cursor.execute(query,result)
+                            conn.commit()
+                        else:
+                            print("Cancelled.")
+            else:
+                v=False
+        print("Exit successful.")
+    elif(a==2):
+        print("~~~~~~~~~~~~~~~~ROUTES~~~~~~~~~~~~~~~~")
+        v=True
+        while v:
+            print("Select : \n1.Display Routes \n2.Destination specific \n3.Start specific \n4.Route number specific \n5.Create Route \n6.Remove Route \n7.Exit")
+            b=int(input("Choice : "))
+            if(b==1):
+                query="select * from routes;"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("No routes availabe.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==2):
+                st=input("Enter Destination : ")
+                value=(st,)
+                query="select * from routes where to_place=%s;"
+                cursor.execute(query,value)
+                row=cursor.fetchall()
+                if not row:
+                    print("No routes found, recheck the entered location for spelling and spaces.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==3):
+                st=input("Enter starting place : ")
+                value=(st,)
+                query="select * from routes where from_place=%s;"
+                cursor.execute(query,value)
+                row=cursor.fetchall()
+                if not row:
+                    print("No routes found, recheck the entered location for spelling and spaces.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==4):
+                rt=int(input("Enter Route number : "))
+                value=(rt,)
+                query="select * from routes where rt_no=%s;"
+                cursor.execute(query,value)
+                row=cursor.fetchall()
+                if not row:
+                    print("No routes found, recheck the entered location for number and spaces.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+            elif(b==5):
+                print("-----------New Route-----------")
+                rt=int(input("Route Number : "))
+                fp=input("Starting from : ")
+                tp=input("Destination : ")
+                dt=int(input("Distance in KM : "))
+                drp=input("Departure Time (in hh:mm:ss) : ")
+                arp=input("Arrival Time (in hh:mm:ss) : ")
+                value=(rt,fp,tp,dt,drp,arp)
+                query="insert into routes (rt_no, from_place, to_place, distance_km, departure, arrival) values (%s,%s,%s,%s,%s,%s);"
+                try:
+                    cursor.execute(query,value)
+                    conn.commit()
+                except c.IntegrityError as err:
+                    print(f"Integrity Error : {err}. Data might already exist.")
+            elif(b==6):
+                rt=int(input("Enter Route number to remove : "))
+                value=(rt,)
+                query="select * from routes where rt_no=%s;"
+                cursor.execute(query,value)
+                row=cursor.fetchall()
+                if not row:
+                    print("No routes found, recheck the entered location for number and spaces.")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows, headers=headers, tablefmt='grid'))
+                    g=int(input("Sure about removal? (1-Yes/2-No) : "))
+                    if(g==1):
+                        query="delete from routes where rt_no=%s"
+                        cursor.execute(query,value)
+                        conn.commit()
+                        query="update vehicle set rt_no=0 where rt_no=%s"
+                        cursor.execute(query,value)
+                        conn.commit()
+                    else:
+                        print("Removal terminated.")
+            else:
+                v=False
+    elif(a==3):
+        print("~~~~~~~~~~~~~FINANCES~~~~~~~~~~~~~")
+        v=True
+        while v:
+            print("Select \n1.Show finances \n2.Add data \n3.Clear data \n4.Exit")
+            ch=int(input("Choice : "))
+            if(ch==1):
+                query="select * from finances;"
+                cursor.execute(query)
+                rows=cursor.fetchall()
+                if not rows:
+                    print("Seems like no vehicles in the fleet")
+                else:
+                    headers=[column[0] for column in cursor.description]
+                    print(tabulate(rows,headers=headers, tablefmt='grid'))
+            elif(ch==2):
+                b=int(input("Select \n1.Main finances \n2.Damages"))
+                if(b==1):
+                    query="select * from finances"
+                    cursor.execute(query)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("Seems like no vehicles in the fleet")
+                    else:
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows,headers=headers, tablefmt='grid'))
+                        nplate=input("Enter number plate (no spaces) : ")
+                        val=(nplate,)
+                        query="Select n_plate from finances where n_plate=%s"
+                        cursor.execute(query,val)
+                        if(cursor.rowcount==0):
+                            print("no such buses present.")
+                        else:
+                            rcest=int(input("Enter estimated running costs in rupees : "))
+                            mmaint=int(input("Enter monthly maintenance : "))
+                            pft=int(input("Enter monthly profit : "))
+                            value=(rcest,mmaint,pft,nplate)
+                            query="update finances set running_cst_est=%s, monthly_maintenance=%s, monthly_profit=%s where n_plate=%s"
+                            cursor.execute(query,value)
+                            conn.commit()
+                else:
+                    query="select * from finances"
+                    cursor.execute(query)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("Seems like no vehicles in the fleet")
+                    else:
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows,headers=headers, tablefmt='grid'))
+                        nplate=input("Enter number plate (no spaces) : ")
+                        val=(nplate,)
+                        query="Select n_plate from finances where n_plate=%s"
+                        cursor.execute(query,val)
+                        if(cursor.rowcount==0):
+                            print("no such buses present.")
+                        else:
+                            dmg=int(input("Enter damage charges : "))
+                            query="update finances set damages_ifany=%s where n_plate=%s"
+                            value=(dmg,nplate)
+                            cursor.execute(query,value)
+                            conn.commit()
+            elif(ch==3):
+                b=int(input("Select \n1.Main finances \n2.Damages"))
+                if(b==1):
+                    query="select * from finances"
+                    cursor.execute(query)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("Seems like no vehicles in the fleet")
+                    else:
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows,headers=headers, tablefmt='grid'))
+                        nplate=input("Enter number plate (no spaces) : ")
+                        val=(nplate,)
+                        query="Select n_plate from finances where n_plate=%s"
+                        cursor.execute(query,val)
+                        if(cursor.rowcount==0):
+                            print("no such buses present.")
+                        else:
+                            value=(0,0,0,nplate)
+                            query="update finances set running_cst_est=%s, monthly_maintenance=%s, monthly_profit=%s where n_plate=%s"
+                            cursor.execute(query,value)
+                            conn.commit()
+                else:
+                    query="select * from finances"
+                    cursor.execute(query)
+                    rows=cursor.fetchall()
+                    if not rows:
+                        print("Seems like no vehicles in the fleet")
+                    else:
+                        headers=[column[0] for column in cursor.description]
+                        print(tabulate(rows,headers=headers, tablefmt='grid'))
+                        nplate=input("Enter number plate (no spaces) : ")
+                        val=(nplate,)
+                        query="Select n_plate from finances where n_plate=%s"
+                        cursor.execute(query,val)
+                        if(cursor.rowcount==0):
+                            print("no such buses present.")
+                        else:
+                            dmg=0
+                            query="update finances set damages_ifany=%s where n_plate=%s"
+                            value=(dmg,nplate)
+                            cursor.execute(query,value)
+                            conn.commit()
+            else:
+                v=False
+    else:
+        y=False
+print("Program Terminated.")
